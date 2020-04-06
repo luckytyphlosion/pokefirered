@@ -1914,10 +1914,19 @@ static void MoveBattleBarGraphically(u8 battlerId, u8 whichBar)
         break;
     }
 }
+
+u32 IsInstantHPBars(void) {
+    return TRUE;
+}
+
 static s32 CalcNewBarValue(s32 maxValue, s32 oldValue, s32 receivedValue, s32 *currValue, u8 scale, u16 toAdd)
 {
     s32 ret, newValue;
     scale *= 8;
+
+    if (IsInstantHPBars()) {
+        toAdd = 32768;
+    }
 
     if (*currValue == -32768) // first function call
     {
@@ -1997,8 +2006,9 @@ static u8 CalcBarFilledPixels(s32 maxValue, s32 oldValue, s32 receivedValue, s32
 {
     u8 pixels, filledPixels, totalPixels;
     u8 i;
+    s32 newValue;
 
-    s32 newValue = oldValue - receivedValue;
+    newValue = oldValue - receivedValue;
     if (newValue < 0)
         newValue = 0;
     else if (newValue > maxValue)
