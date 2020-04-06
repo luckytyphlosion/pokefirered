@@ -36,6 +36,8 @@ static const u8 sFontHalfRowOffsets[] =
     0x00, 0x01, 0x02, 0x00, 0x03, 0x04, 0x05, 0x03, 0x06, 0x07, 0x08, 0x06, 0x00, 0x01, 0x02, 0x00
 };
 
+static void RunTextPrintersForInstantText(void);
+
 void SetFontsPointer(const struct FontInfo *fonts)
 {
     gFonts = fonts;
@@ -46,6 +48,10 @@ void DeactivateAllTextPrinters (void)
     int printer;
     for (printer = 0; printer < NUM_TEXT_PRINTERS; ++printer)
         sTextPrinters[printer].active = 0;
+}
+
+u32 IsInstantText(void) {
+    return TRUE;
 }
 
 u16 AddTextPrinterParameterized(u8 windowId, u8 fontId, const u8 *str, u8 x, u8 y, u8 speed, void (*callback)(struct TextPrinterTemplate *, u16))
@@ -75,6 +81,10 @@ bool16 AddTextPrinter(struct TextPrinterTemplate *textSubPrinter, u8 speed, void
 
     if (!gFonts)
         return FALSE;
+
+    if (IsInstantText() && speed != 0 && speed != TEXT_SPEED_FF) {
+        speed = 1;
+    }
 
     sTempTextPrinter.active = 1;
     sTempTextPrinter.state = 0;
@@ -119,6 +129,11 @@ void RunTextPrinters(void)
     int i;
     u16 temp;
 
+    if (IsInstantText()) {
+        RunTextPrintersForInstantText();
+        return;
+    }
+
     for (i = 0; i < 0x20; ++i)
     {
         if (sTextPrinters[i].active != 0)
@@ -134,6 +149,41 @@ void RunTextPrinters(void)
                 case 1:
                     sTextPrinters[i].active = 0;
                     break;
+            }
+        }
+    }
+}
+
+static void RunTextPrintersForInstantText(void) {
+    int i, j;
+    u16 result;
+
+    for (i = 0; i < 0x20; ++i)
+    {
+        if (sTextPrinters[i].active != 0)
+        {
+            for (j = 0; j < 0x400; j++) {
+                u32 oldState;
+                u32 newState;
+
+                oldState = sTextPrinters[i].state;
+                result = RenderFont(&sTextPrinters[i]);
+                newState = sTextPrinters[i].state;
+
+                if (result == 0) {
+                    if (sTextPrinters[i].callback != 0)
+                        sTextPrinters[i].callback(&sTextPrinters[i].printerTemplate, result);
+                } else if (result == 3) {
+                    if (sTextPrinters[i].callback != 0)
+                        sTextPrinters[i].callback(&sTextPrinters[i].printerTemplate, result);
+                    if (oldState == 0 && newState != 0)
+                        CopyWindowToVram(sTextPrinters[i].printerTemplate.windowId, 2);
+                    break;
+                } else if (result == 1) {
+                    CopyWindowToVram(sTextPrinters[i].printerTemplate.windowId, 2);
+                    sTextPrinters[i].active = 0;
+                    break;
+                }
             }
         }
     }
