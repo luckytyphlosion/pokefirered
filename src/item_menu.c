@@ -33,6 +33,7 @@
 #include "tm_case.h"
 #include "constants/items.h"
 #include "constants/songs.h"
+#include "fast_item_description.h"
 
 #define FREE_IF_SET(ptr) ({ if (ptr) Free(ptr); })
 
@@ -158,10 +159,6 @@ static void Task_Bag_TeachyTvRegister(u8 taskId);
 static void Task_Bag_TeachyTvCatching(u8 taskId);
 static void Task_Bag_TeachyTvStatus(u8 taskId);
 static void Task_Bag_TeachyTvTMs(u8 taskId);
-
-extern void RunTextPrinter1(void);
-extern void StopItemDescriptionPrint(void);
-extern void PrintRestOfItemDescription(void);
 
 static const struct BgTemplate sBgTemplates[2] = {
     {

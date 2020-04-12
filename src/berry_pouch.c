@@ -29,6 +29,7 @@
 #include "pokemon_storage_system.h"
 #include "constants/items.h"
 #include "constants/songs.h"
+#include "fast_item_description.h"
 
 struct BerryPouchStruct_203F36C
 {
@@ -440,6 +441,7 @@ void InitBerryPouch(u8 type, void (*savedCallback)(void), u8 allowSelect)
 static void CB2_BerryPouchIdle(void)
 {
     RunTasks();
+    RunTextPrinter1();
     AnimateSprites();
     BuildOamBuffer();
     DoScheduledBgTilemapCopiesToVram();
@@ -760,7 +762,7 @@ static void PrintSelectedBerryDescription(s32 itemIdx)
     else
         str = gText_TheBerryPouchWillBePutAway;
     FillWindowPixelBuffer(1, PIXEL_FILL(0));
-    BerryPouchPrint(1, 2, str, 0, 2, 2, 0, 0, 0);
+    BerryPouchPrint(1, 2, str, 0, 2, 2, 0, 1, 0);
 }
 
 static void SetDescriptionWindowBorderPalette(s32 pal)
@@ -868,6 +870,7 @@ static void Task_BerryPouchFadeToExitCallback(u8 taskId)
     s16 * data = gTasks[taskId].data;
     if (!gPaletteFade.active)
     {
+        StopItemDescriptionPrint();
         DestroyListMenuTask(data[0], &sStaticCnt.listMenuScrollOffset, &sStaticCnt.listMenuSelectedRow);
         if (sResources->exitCallback != NULL)
             SetMainCallback2(sResources->exitCallback);
@@ -972,6 +975,7 @@ static void Task_BerryPouchMain(u8 taskId)
                 }
                 else
                 {
+                    PrintRestOfItemDescription();
                     DestroyScrollIndicatorArrows();
                     SetDescriptionWindowBorderPalette(1);
                     BerryPouchSetArrowCursorFromListMenu(data[0], 2);
@@ -1174,10 +1178,17 @@ static void Task_WaitButtonThenTossBerries(u8 taskId)
         SortAndCountBerries();
         SanitizeListMenuSelectionParams();
         SetUpListMenuTemplate();
+
+        gMultiuseListMenuTemplate.moveCursorFunc = NULL;
+
         data[0] = ListMenuInit(&gMultiuseListMenuTemplate, sStaticCnt.listMenuScrollOffset, sStaticCnt.listMenuSelectedRow);
         PutWindowTilemap(1);
         ScheduleBgCopyTilemapToVram(0);
         BerryPouchSetArrowCursorFromListMenu(data[0], 1);
+
+        ((struct ListMenu *)gTasks[data[0]].data)->template.moveCursorFunc = BerryPouchMoveCursorFunc;
+        BerryPouchMoveCursorFunc(sListMenuItems[sStaticCnt.listMenuScrollOffset + sStaticCnt.listMenuSelectedRow].index, TRUE, NULL);
+
         Task_CleanUpAndReturnToMain(taskId);
     }
 }
@@ -1221,9 +1232,15 @@ void Task_BerryPouch_DestroyDialogueWindowAndRefreshListMenu(u8 taskId)
     SortAndCountBerries();
     SanitizeListMenuSelectionParams();
     SetUpListMenuTemplate();
+
+    gMultiuseListMenuTemplate.moveCursorFunc = NULL;
+
     data[0] = ListMenuInit(&gMultiuseListMenuTemplate, sStaticCnt.listMenuScrollOffset, sStaticCnt.listMenuSelectedRow);
     ScheduleBgCopyTilemapToVram(0);
     BerryPouchSetArrowCursorFromListMenu(data[0], 1);
+
+    ((struct ListMenu *)gTasks[data[0]].data)->template.moveCursorFunc = BerryPouchMoveCursorFunc;
+    BerryPouchMoveCursorFunc(sListMenuItems[sStaticCnt.listMenuScrollOffset + sStaticCnt.listMenuSelectedRow].index, TRUE, NULL);
     Task_CleanUpAndReturnToMain(taskId);
 }
 
