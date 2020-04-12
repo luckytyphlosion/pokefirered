@@ -28,6 +28,7 @@
 #include "menu_indicators.h"
 #include "constants/items.h"
 #include "constants/songs.h"
+#include "fast_item_description.h"
 
 #define TM_CASE_TM_TAG 400
 
@@ -287,6 +288,7 @@ void InitTMCase(u8 type, void (* callback)(void), u8 a2)
 static void CB2_Idle(void)
 {
     RunTasks();
+    RunTextPrinter1();
     AnimateSprites();
     BuildOamBuffer();
     DoScheduledBgTilemapCopiesToVram();
@@ -556,8 +558,8 @@ static void TMCase_MoveCursorFunc(s32 itemIndex, bool8 onInit, struct ListMenu *
         PlaySE(SE_SELECT);
         InitSelectedTMSpriteData(sTMCaseDynamicResources->tmSpriteId, itemId);
     }
-    TMCase_MoveCursor_UpdatePrintedDescription(itemIndex);
     TMCase_MoveCursor_UpdatePrintedTMInfo(itemId);
+    TMCase_MoveCursor_UpdatePrintedDescription(itemIndex);
 }
 
 static void TMCase_ItemPrintFunc(u8 windowId, s32 itemId, u8 y)
@@ -589,7 +591,7 @@ static void TMCase_MoveCursor_UpdatePrintedDescription(s32 itemIndex)
         str = gText_TMCaseWillBePutAway;
     }
     FillWindowPixelBuffer(1, 0);
-    AddTextPrinterParameterized_ColorByIndex(1, 2, str, 2, 3, 1, 0, 0, 0);
+    AddTextPrinterParameterized_ColorByIndex(1, 2, str, 2, 3, 1, 0, 1, 0);
 }
 
 static void FillBG2RowWithPalette_2timesNplus1(s32 a0)
@@ -715,6 +717,7 @@ static void Task_FadeOutAndCloseTMCase(u8 taskId)
 
     if (!gPaletteFade.active)
     {
+        StopItemDescriptionPrint();
         DestroyListMenuTask(data[0], &sTMCaseStaticResources.scrollOffset, &sTMCaseStaticResources.selectedRow);
         if (sTMCaseDynamicResources->savedCallback != NULL)
             SetMainCallback2(sTMCaseDynamicResources->savedCallback);
@@ -756,6 +759,7 @@ static void Task_TMCaseMain(u8 taskId)
                     break;
                 default:
                     PlaySE(SE_SELECT);
+                    PrintRestOfItemDescription();
                     FillBG2RowWithPalette_2timesNplus1(1);
                     RemoveTMCaseScrollIndicatorArrowPair();
                     PrintListMenuCursorByID_WithColorIdx(data[0], 2);
@@ -909,8 +913,13 @@ static void Subtask_CloseContextMenuAndReturnToMain(u8 taskId)
     s16 * data = gTasks[taskId].data;
 
     DestroyListMenuTask(data[0], &sTMCaseStaticResources.scrollOffset, &sTMCaseStaticResources.selectedRow);
+
+    gMultiuseListMenuTemplate.moveCursorFunc = NULL;
+
     data[0] = ListMenuInit(&gMultiuseListMenuTemplate, sTMCaseStaticResources.scrollOffset, sTMCaseStaticResources.selectedRow);
+
     PrintListMenuCursorByID_WithColorIdx(data[0], 1);
+
     ClearDialogWindowAndFrameToTransparent(6, 0);
     ClearWindowTilemap(6);
     PutWindowTilemap(1);
@@ -918,6 +927,10 @@ static void Subtask_CloseContextMenuAndReturnToMain(u8 taskId)
     PutWindowTilemap(5);
     ScheduleBgCopyTilemapToVram(0);
     ScheduleBgCopyTilemapToVram(1);
+
+    ((struct ListMenu *)gTasks[data[0]].data)->template.moveCursorFunc = TMCase_MoveCursorFunc;
+    TMCase_MoveCursorFunc(sListMenuItemsBuffer[sTMCaseStaticResources.scrollOffset + sTMCaseStaticResources.selectedRow].index, TRUE, NULL);
+
     Subtask_ReturnToTMCaseMain(taskId);
 }
 
@@ -1111,9 +1124,16 @@ static void Task_DoSaleOfTMs(u8 taskId)
     TMCaseSetup_GetTMCount();
     TMCaseSetup_InitListMenuPositions();
     InitTMCaseListMenuItems();
+
+    gMultiuseListMenuTemplate.moveCursorFunc = NULL;
+
     data[0] = ListMenuInit(&gMultiuseListMenuTemplate, sTMCaseStaticResources.scrollOffset, sTMCaseStaticResources.selectedRow);
     PrintListMenuCursorByID_WithColorIdx(data[0], 2);
     PrintMoneyAmountInMoneyBox(8, GetMoney(&gSaveBlock1Ptr->money), 0);
+
+    ((struct ListMenu *)gTasks[data[0]].data)->template.moveCursorFunc = TMCase_MoveCursorFunc;
+    TMCase_MoveCursorFunc(sListMenuItemsBuffer[sTMCaseStaticResources.scrollOffset + sTMCaseStaticResources.selectedRow].index, TRUE, NULL);
+
     gTasks[taskId].func = Task_AfterSale_ReturnToList;
 }
 
