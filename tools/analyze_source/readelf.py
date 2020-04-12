@@ -57,8 +57,8 @@ if __name__ == "__main__":
     ap.add_argument("-p", "--path", dest="input_path")
     args = ap.parse_args()
 
-    if args.input_path is None and os.path.basename(os.getcwd()) == "tools":
-        os.chdir("..")
+    if args.input_path is None and os.path.basename(os.getcwd()) == "analyze_source":
+        os.chdir("../..")
     elif args.input_path is not None:
         os.chdir(args.input_path)
 

@@ -159,6 +159,10 @@ static void Task_Bag_TeachyTvCatching(u8 taskId);
 static void Task_Bag_TeachyTvStatus(u8 taskId);
 static void Task_Bag_TeachyTvTMs(u8 taskId);
 
+extern void RunTextPrinter1(void);
+extern void StopItemDescriptionPrint(void);
+extern void PrintRestOfItemDescription(void);
+
 static const struct BgTemplate sBgTemplates[2] = {
     {
         .bg = 0,
@@ -360,6 +364,7 @@ void CB2_BagMenuFromBattle(void)
 static void CB2_BagMenuRun(void)
 {
     RunTasks();
+    RunTextPrinter1();
     AnimateSprites();
     BuildOamBuffer();
     DoScheduledBgTilemapCopiesToVram();
@@ -758,7 +763,7 @@ static void PrintItemDescriptionOnMessageWindow(s32 itemIndex)
     else
         description = gText_CloseBag;
     FillWindowPixelBuffer(1, PIXEL_FILL(0));
-    BagPrintTextOnWindow(1, 2, description, 0, 3, 2, 0, 0, 0);
+    BagPrintTextOnWindow(1, 2, description, 0, 3, 2, 0, 1, 0);
 }
 
 static void CreatePocketScrollArrowPair(void)
@@ -906,6 +911,7 @@ static void Task_ItemMenu_WaitFadeAndSwitchToExitCallback(u8 taskId)
     s16 *data = gTasks[taskId].data;
     if (!gPaletteFade.active && FuncIsActiveTask(Task_AnimateWin0v) != TRUE)
     {
+        StopItemDescriptionPrint();
         DestroyListMenuTask(data[0], &gBagMenuState.cursorPos[gBagMenuState.pocket], &gBagMenuState.itemsAbove[gBagMenuState.pocket]);
         if (sBagMenuDisplay->exitCB != NULL)
             SetMainCallback2(sBagMenuDisplay->exitCB);
@@ -1095,6 +1101,7 @@ static void Task_BagMenu_HandleInput(u8 taskId)
         }
         else
         {
+            PrintRestOfItemDescription();
             BagDestroyPocketScrollArrowPair();
             bag_menu_print_cursor_(data[0], 2);
             data[1] = input;
@@ -1117,6 +1124,7 @@ static void Task_RedrawArrowsAndReturnToBagMenuSelect(u8 taskId)
     Bag_FillMessageBoxWithPalette(0);
     CreatePocketScrollArrowPair();
     CreatePocketSwitchArrowPair();
+    
     gTasks[taskId].func = Task_BagMenu_HandleInput;
 }
 
@@ -1157,6 +1165,7 @@ static void SwitchPockets(u8 taskId, s16 direction, bool16 a2)
     data[11] = direction;
     if (!a2)
     {
+        StopItemDescriptionPrint();
         ClearWindowTilemap(0);
         ClearWindowTilemap(1);
         ClearWindowTilemap(2);
@@ -1568,6 +1577,7 @@ static void Task_WaitAB_RedrawAndReturnToBag(u8 taskId)
     s16 *data = gTasks[taskId].data;
     if (JOY_NEW(A_BUTTON) || JOY_NEW(B_BUTTON))
     {
+        u16 cursorPos, itemsAbove, cursor;
         PlaySE(SE_SELECT);
         RemoveBagItem(gSpecialVar_ItemId, data[8]);
         HideBagWindow(6);
@@ -1575,10 +1585,27 @@ static void Task_WaitAB_RedrawAndReturnToBag(u8 taskId)
         Pocket_CalculateNItemsAndMaxShowed(gBagMenuState.pocket);
         PocketCalculateInitialCursorPosAndItemsAbove(gBagMenuState.pocket);
         Bag_BuildListMenuTemplate(gBagMenuState.pocket);
-        data[0] = ListMenuInit(&gMultiuseListMenuTemplate, gBagMenuState.cursorPos[gBagMenuState.pocket], gBagMenuState.itemsAbove[gBagMenuState.pocket]);
+
+        // need to disable cursor func until the cursor is printed
+        // or else the game uses the wrong font for the description
+        gMultiuseListMenuTemplate.moveCursorFunc = NULL;
+
+        // optimization: don't re-read from gBagMenuState later
+        cursorPos = gBagMenuState.cursorPos[gBagMenuState.pocket];
+        itemsAbove = gBagMenuState.itemsAbove[gBagMenuState.pocket];
+        cursor = cursorPos + itemsAbove;
+
+        data[0] = ListMenuInit(&gMultiuseListMenuTemplate, cursorPos, itemsAbove);
         PutWindowTilemap(1);
         ScheduleBgCopyTilemapToVram(0);
         bag_menu_print_cursor_(data[0], 1);
+
+        // now that the cursor has been printed, manually patch back the cursor func
+        ((struct ListMenu *)gTasks[data[0]].data)->template.moveCursorFunc = BagListMenuMoveCursorFunc;
+
+        // ...and call the cursor callback
+        BagListMenuMoveCursorFunc(sListMenuItems[cursor].index, TRUE, NULL); // list (third) argument isn't actually used
+
         Task_RedrawArrowsAndReturnToBagMenuSelect(taskId);
     }
 }
@@ -1651,14 +1678,32 @@ static void Task_WaitAButtonAndCloseContextMenu(u8 taskId)
 void Task_ReturnToBagFromContextMenu(u8 taskId)
 {
     s16 *data = gTasks[taskId].data;
+    u16 cursorPos, itemsAbove, cursor;
+
     CloseBagWindow(5);
     DestroyListMenuTask(data[0], &gBagMenuState.cursorPos[gBagMenuState.pocket], &gBagMenuState.itemsAbove[gBagMenuState.pocket]);
     Pocket_CalculateNItemsAndMaxShowed(gBagMenuState.pocket);
     PocketCalculateInitialCursorPosAndItemsAbove(gBagMenuState.pocket);
     Bag_BuildListMenuTemplate(gBagMenuState.pocket);
-    data[0] = ListMenuInit(&gMultiuseListMenuTemplate, gBagMenuState.cursorPos[gBagMenuState.pocket], gBagMenuState.itemsAbove[gBagMenuState.pocket]);
+
+    // need to disable cursor func until the cursor is printed
+    // or else the game uses the wrong font for the description
+    gMultiuseListMenuTemplate.moveCursorFunc = NULL;
+
+    // optimization: don't re-read from gBagMenuState later
+    cursorPos = gBagMenuState.cursorPos[gBagMenuState.pocket];
+    itemsAbove = gBagMenuState.itemsAbove[gBagMenuState.pocket];
+    cursor = cursorPos + itemsAbove;
+
+    data[0] = ListMenuInit(&gMultiuseListMenuTemplate, cursorPos, itemsAbove);
     ScheduleBgCopyTilemapToVram(0);
     bag_menu_print_cursor_(data[0], 1);
+
+    // now that the cursor has been printed, manually patch back the cursor func
+    ((struct ListMenu *)gTasks[data[0]].data)->template.moveCursorFunc = BagListMenuMoveCursorFunc;
+
+    // ...and call the cursor callback
+    BagListMenuMoveCursorFunc(sListMenuItems[cursor].index, TRUE, NULL); // list (third) argument isn't actually used
     Task_RedrawArrowsAndReturnToBagMenuSelect(taskId);
 }
 
