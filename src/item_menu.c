@@ -1569,6 +1569,26 @@ static void Task_TossItem_Yes(u8 taskId)
     gTasks[taskId].func = Task_WaitAB_RedrawAndReturnToBag;
 }
 
+static u8 ListMenuInit_NullCursorFunc(const struct ListMenuTemplate *listMenuTemplate, u16 cursorPos, u16 itemsAbove) {
+    // need to disable cursor func until the cursor is printed
+    // or else the game uses the wrong font for the description
+    gMultiuseListMenuTemplate.moveCursorFunc = NULL;
+    ListMenuInit(listMenuTemplate, cursorPos, itemsAbove);
+}
+
+static void FixFastItemDescription_AfterListMenuInit(u8 data0, u8 taskId) {
+    ScheduleBgCopyTilemapToVram(0);
+    bag_menu_print_cursor_(data0, 1);
+    
+    // now that the cursor has been printed, manually patch back the cursor func
+    ((struct ListMenu *)gTasks[data0].data)->template.moveCursorFunc = BagListMenuMoveCursorFunc;
+
+    // ...and call the cursor callback
+    BagListMenuMoveCursorFunc(sListMenuItems[gBagMenuState.cursorPos[gBagMenuState.pocket] + gBagMenuState.itemsAbove[gBagMenuState.pocket]].index, TRUE, NULL); // list (third) argument isn't actually used
+
+    Task_RedrawArrowsAndReturnToBagMenuSelect(taskId);
+}
+
 static void Task_WaitAB_RedrawAndReturnToBag(u8 taskId)
 {
     s16 *data = gTasks[taskId].data;
@@ -1583,27 +1603,9 @@ static void Task_WaitAB_RedrawAndReturnToBag(u8 taskId)
         PocketCalculateInitialCursorPosAndItemsAbove(gBagMenuState.pocket);
         Bag_BuildListMenuTemplate(gBagMenuState.pocket);
 
-        // need to disable cursor func until the cursor is printed
-        // or else the game uses the wrong font for the description
-        gMultiuseListMenuTemplate.moveCursorFunc = NULL;
-
-        // optimization: don't re-read from gBagMenuState later
-        cursorPos = gBagMenuState.cursorPos[gBagMenuState.pocket];
-        itemsAbove = gBagMenuState.itemsAbove[gBagMenuState.pocket];
-        cursor = cursorPos + itemsAbove;
-
-        data[0] = ListMenuInit(&gMultiuseListMenuTemplate, cursorPos, itemsAbove);
+        data[0] = ListMenuInit_NullCursorFunc(&gMultiuseListMenuTemplate, gBagMenuState.cursorPos[gBagMenuState.pocket], gBagMenuState.itemsAbove[gBagMenuState.pocket]);
         PutWindowTilemap(1);
-        ScheduleBgCopyTilemapToVram(0);
-        bag_menu_print_cursor_(data[0], 1);
-
-        // now that the cursor has been printed, manually patch back the cursor func
-        ((struct ListMenu *)gTasks[data[0]].data)->template.moveCursorFunc = BagListMenuMoveCursorFunc;
-
-        // ...and call the cursor callback
-        BagListMenuMoveCursorFunc(sListMenuItems[cursor].index, TRUE, NULL); // list (third) argument isn't actually used
-
-        Task_RedrawArrowsAndReturnToBagMenuSelect(taskId);
+        FixFastItemDescription_AfterListMenuInit(data[0], taskId);
     }
 }
 
@@ -1683,25 +1685,8 @@ void Task_ReturnToBagFromContextMenu(u8 taskId)
     PocketCalculateInitialCursorPosAndItemsAbove(gBagMenuState.pocket);
     Bag_BuildListMenuTemplate(gBagMenuState.pocket);
 
-    // need to disable cursor func until the cursor is printed
-    // or else the game uses the wrong font for the description
-    gMultiuseListMenuTemplate.moveCursorFunc = NULL;
-
-    // optimization: don't re-read from gBagMenuState later
-    cursorPos = gBagMenuState.cursorPos[gBagMenuState.pocket];
-    itemsAbove = gBagMenuState.itemsAbove[gBagMenuState.pocket];
-    cursor = cursorPos + itemsAbove;
-
-    data[0] = ListMenuInit(&gMultiuseListMenuTemplate, cursorPos, itemsAbove);
-    ScheduleBgCopyTilemapToVram(0);
-    bag_menu_print_cursor_(data[0], 1);
-
-    // now that the cursor has been printed, manually patch back the cursor func
-    ((struct ListMenu *)gTasks[data[0]].data)->template.moveCursorFunc = BagListMenuMoveCursorFunc;
-
-    // ...and call the cursor callback
-    BagListMenuMoveCursorFunc(sListMenuItems[cursor].index, TRUE, NULL); // list (third) argument isn't actually used
-    Task_RedrawArrowsAndReturnToBagMenuSelect(taskId);
+    data[0] = ListMenuInit_NullCursorFunc(&gMultiuseListMenuTemplate, gBagMenuState.cursorPos[gBagMenuState.pocket], gBagMenuState.itemsAbove[gBagMenuState.pocket]);
+    FixFastItemDescription_AfterListMenuInit(data[0], taskId);
 }
 
 static void unref_sub_810A288(u8 taskId)
