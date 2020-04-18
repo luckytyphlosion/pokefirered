@@ -51,7 +51,7 @@ void DeactivateAllTextPrinters (void)
 }
 
 u32 IsInstantText(void) {
-    return TRUE;
+    return FALSE;
 }
 
 u16 AddTextPrinterParameterized(u8 windowId, u8 fontId, const u8 *str, u8 x, u8 y, u8 speed, void (*callback)(struct TextPrinterTemplate *, u16))
@@ -122,6 +122,45 @@ bool16 AddTextPrinter(struct TextPrinterTemplate *textSubPrinter, u8 speed, void
         sTextPrinters[textSubPrinter->windowId].active = 0;
     }
     return TRUE;
+}
+
+void StopItemDescriptionPrint(void) {
+    sTextPrinters[1].active = FALSE;
+}
+
+void RunTextPrinter1(void) {
+
+    if (sTextPrinters[1].active != 0)
+    {
+        u16 temp = RenderFont(&sTextPrinters[1]);
+        switch (temp) {
+            case 0:
+                CopyWindowToVram(sTextPrinters[1].printerTemplate.windowId, 2);
+            case 3:
+                if (sTextPrinters[1].callback != 0)
+                    sTextPrinters[1].callback(&sTextPrinters[1].printerTemplate, temp);
+                break;
+            case 1:
+                sTextPrinters[1].active = 0;
+                break;
+        }
+    }
+}
+
+void PrintRestOfItemDescription(void) {
+    int j;
+
+    if (sTextPrinters[1].active == FALSE) {
+        return;
+    }
+
+    for (j = 0; j < 0x400; ++j)
+    {
+        if ((u32)RenderFont(&sTextPrinters[1]) == 1)
+            break;
+    }
+    CopyWindowToVram(1, 2);
+    sTextPrinters[1].active = FALSE;
 }
 
 void RunTextPrinters(void)

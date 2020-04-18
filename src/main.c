@@ -224,7 +224,7 @@ void EnableVCountIntrAtLine150(void)
 
 void InitKeys(void)
 {
-    gKeyRepeatContinueDelay = 5;
+    gKeyRepeatContinueDelay = 3;
     gKeyRepeatStartDelay = 40;
 
     gMain.heldKeys = 0;
