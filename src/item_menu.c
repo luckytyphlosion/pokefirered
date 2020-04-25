@@ -1609,6 +1609,26 @@ static void Task_WaitAB_RedrawAndReturnToBag(u8 taskId)
     }
 }
 
+static void Task_ItemMenuAction_ToggleSelect_FixColorHook(u8 taskId, s16 * data)
+{
+    gMultiuseListMenuTemplate.moveCursorFunc = NULL;
+    data[0] = ListMenuInit(&gMultiuseListMenuTemplate, gBagMenuState.cursorPos[gBagMenuState.pocket], gBagMenuState.itemsAbove[gBagMenuState.pocket]);
+
+    CopyWindowToVram(0, 1);
+    HideBagWindow(10);
+    HideBagWindow(6);
+    PutWindowTilemap(0);
+    PutWindowTilemap(1);
+    ScheduleBgCopyTilemapToVram(0);
+    bag_menu_print_cursor_(gTasks[taskId].data[0], 1);
+
+    ((struct ListMenu *)gTasks[data[0]].data)->template.moveCursorFunc = BagListMenuMoveCursorFunc;
+    
+    BagListMenuMoveCursorFunc(sListMenuItems[gBagMenuState.cursorPos[gBagMenuState.pocket] + gBagMenuState.itemsAbove[gBagMenuState.pocket]].index, TRUE, NULL);
+
+    Task_RedrawArrowsAndReturnToBagMenuSelect(taskId);
+}
+
 static void Task_ItemMenuAction_ToggleSelect(u8 taskId)
 {
     u16 itemId;
@@ -1621,9 +1641,8 @@ static void Task_ItemMenuAction_ToggleSelect(u8 taskId)
 
     DestroyListMenuTask(data[0], &gBagMenuState.cursorPos[gBagMenuState.pocket], &gBagMenuState.itemsAbove[gBagMenuState.pocket]);
     Bag_BuildListMenuTemplate(gBagMenuState.pocket);
-    data[0] = ListMenuInit(&gMultiuseListMenuTemplate, gBagMenuState.cursorPos[gBagMenuState.pocket], gBagMenuState.itemsAbove[gBagMenuState.pocket]);
-    CopyWindowToVram(0, 1);
-    Task_ItemMenuAction_Cancel(taskId);
+
+    Task_ItemMenuAction_ToggleSelect_FixColorHook(taskId, data);
 }
 
 static void Task_ItemMenuAction_Give(u8 taskId)
