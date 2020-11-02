@@ -4,6 +4,7 @@
 #include "string_util.h"
 #include "window.h"
 #include "text.h"
+#include "new_menu_helpers.h"
 
 static EWRAM_DATA struct TextPrinter sTempTextPrinter = {0};
 static EWRAM_DATA struct TextPrinter sTextPrinters[NUM_TEXT_PRINTERS] = {0};
@@ -50,10 +51,6 @@ void DeactivateAllTextPrinters (void)
         sTextPrinters[printer].active = 0;
 }
 
-u32 IsInstantText(void) {
-    return FALSE;
-}
-
 u16 AddTextPrinterParameterized(u8 windowId, u8 fontId, const u8 *str, u8 x, u8 y, u8 speed, void (*callback)(struct TextPrinterTemplate *, u16))
 {
     struct TextPrinterTemplate printerTemplate;
@@ -82,7 +79,7 @@ bool16 AddTextPrinter(struct TextPrinterTemplate *textSubPrinter, u8 speed, void
     if (!gFonts)
         return FALSE;
 
-    if (IsInstantText() && speed != 0 && speed != TEXT_SPEED_FF) {
+    if (speed == 0x7f) {
         speed = 1;
     }
 
@@ -153,7 +150,7 @@ void RunTextPrinters(void)
     int i;
     u16 temp;
 
-    if (IsInstantText()) {
+    if (GetTextSpeedSetting() == 0x7f) {
         RunTextPrintersForInstantText();
         return;
     }
